@@ -36,6 +36,18 @@ function buildQuery(transcript: string): string {
   return words.slice(0, MAX_QUERY_WORDS).join(' ');
 }
 
+/**
+ * Genius hosts annotated books, poems, and articles alongside songs, and
+ * its /search endpoint returns them under the same `type: "song"` shape.
+ * The reliable signal that a hit is an actual song is the URL suffix:
+ * lyric pages always end with `-lyrics`, other content uses `-annotated`,
+ * `-chapter-N`, etc.
+ */
+function isLyricsUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return /-lyrics(?:[/?#]|$)/.test(url);
+}
+
 export async function searchGenius(transcript: string): Promise<GeniusCandidate[]> {
   if (!GENIUS_TOKEN) return [];
   const query = buildQuery(transcript);
@@ -52,7 +64,7 @@ export async function searchGenius(transcript: string): Promise<GeniusCandidate[
     const json = (await res.json()) as { response?: { hits?: GeniusSearchHit[] } };
     const hits = json.response?.hits ?? [];
     return hits
-      .filter((h) => h.type === 'song')
+      .filter((h) => h.type === 'song' && isLyricsUrl(h.result.url))
       .map((h, i) => ({
         title: h.result.title,
         artist: h.result.primary_artist.name,
