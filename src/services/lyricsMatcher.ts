@@ -5,6 +5,22 @@ const SUGGEST_URL = 'https://api.lyrics.ovh/suggest';
 const LYRICS_URL = 'https://api.lyrics.ovh/v1';
 
 const CANDIDATES_TO_RANK = 6;
+const MAX_QUERY_WORDS = 10;
+
+/**
+ * lyrics.ovh's /suggest endpoint matches best against short, clean phrases.
+ * Long transcripts (and especially noisy ones with repeated words from
+ * stutters or speech-recognition artifacts) return junk, so we trim to the
+ * first N words and collapse consecutive duplicates before searching.
+ */
+function buildSearchQuery(transcript: string): string {
+  const words = transcript.toLowerCase().split(/\s+/).filter(Boolean);
+  const deduped: string[] = [];
+  for (const w of words) {
+    if (deduped[deduped.length - 1] !== w) deduped.push(w);
+  }
+  return deduped.slice(0, MAX_QUERY_WORDS).join(' ');
+}
 
 async function fetchSuggestions(query: string): Promise<LyricsOvhSuggestion[]> {
   const res = await fetch(`${SUGGEST_URL}/${encodeURIComponent(query)}`);
@@ -30,7 +46,8 @@ export async function findMatches(transcript: string, limit = 5): Promise<SongMa
   const cleaned = transcript.trim();
   if (cleaned.length === 0) return [];
 
-  const suggestions = await fetchSuggestions(cleaned);
+  const query = buildSearchQuery(cleaned);
+  const suggestions = await fetchSuggestions(query);
   if (suggestions.length === 0) return [];
 
   const top = suggestions.slice(0, CANDIDATES_TO_RANK);

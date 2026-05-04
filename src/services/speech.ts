@@ -65,21 +65,26 @@ export function startRecognition(handlers: SpeechHandlers): SpeechController | n
   recognition.interimResults = true;
   recognition.lang = 'en-US';
 
-  let finalText = '';
+  // event.results is the cumulative list of all results since the session
+  // started — finalized and interim. We rebuild the transcript from scratch
+  // on every event so finalized chunks don't get appended repeatedly.
+  let lastFinal = '';
 
   recognition.onresult = (event) => {
+    let final = '';
     let interim = '';
     for (let i = 0; i < event.results.length; i++) {
       const result = event.results[i];
       const alt = result[0];
       if (!alt) continue;
       if (result.isFinal) {
-        finalText += alt.transcript + ' ';
+        final += alt.transcript + ' ';
       } else {
         interim += alt.transcript;
       }
     }
-    const combined = (finalText + interim).trim();
+    lastFinal = final.trim();
+    const combined = (final + interim).trim();
     handlers.onTranscript(combined, false);
   };
 
@@ -88,7 +93,7 @@ export function startRecognition(handlers: SpeechHandlers): SpeechController | n
   };
 
   recognition.onend = () => {
-    handlers.onTranscript(finalText.trim(), true);
+    handlers.onTranscript(lastFinal, true);
     handlers.onEnd();
   };
 
