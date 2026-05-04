@@ -2,9 +2,11 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { MatchCard } from './src/components/MatchCard';
@@ -26,6 +28,7 @@ import type { SongMatch } from './src/types';
 export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const [results, setResults] = useState<SongMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +64,7 @@ export default function App() {
     if (!text.trim()) return;
     setIsSearching(true);
     setError(null);
+    setResults([]);
     try {
       const matches = await findMatches(text);
       // Apple Music has no auth — we can pre-fetch its link for every match.
@@ -97,6 +101,7 @@ export default function App() {
     setStatusMessage(null);
     setResults([]);
     setTranscript('');
+    setIsEditing(false);
     const c = startRecognition({
       onTranscript: (text, isFinal) => {
         setTranscript(text);
@@ -123,6 +128,19 @@ export default function App() {
     controller.current?.stop();
     setIsRecording(false);
   }, []);
+
+  const handleEdit = useCallback(() => {
+    if (isRecording) {
+      controller.current?.stop();
+      setIsRecording(false);
+    }
+    setIsEditing(true);
+  }, [isRecording]);
+
+  const handleSearchEdited = useCallback(() => {
+    setIsEditing(false);
+    void runSearch(transcript);
+  }, [transcript, runSearch]);
 
   const handleSpotifyPress = useCallback(async (match: SongMatch) => {
     setError(null);
@@ -160,8 +178,32 @@ export default function App() {
 
         {transcript ? (
           <View style={styles.transcriptBox}>
-            <Text style={styles.transcriptLabel}>You sang</Text>
-            <Text style={styles.transcript}>{transcript}</Text>
+            <View style={styles.transcriptHeader}>
+              <Text style={styles.transcriptLabel}>You sang</Text>
+              {!isRecording ? (
+                <Pressable
+                  onPress={isEditing ? handleSearchEdited : handleEdit}
+                  hitSlop={8}
+                >
+                  <Text style={styles.editAction}>
+                    {isEditing ? 'Search' : 'Edit'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {isEditing ? (
+              <TextInput
+                value={transcript}
+                onChangeText={setTranscript}
+                multiline
+                autoFocus
+                style={styles.transcriptInput}
+                placeholder="Type the lyrics you sang…"
+                placeholderTextColor="#6b7280"
+              />
+            ) : (
+              <Text style={styles.transcript}>{transcript}</Text>
+            )}
           </View>
         ) : null}
 
@@ -234,10 +276,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2a2a3e',
   },
+  transcriptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   transcriptLabel: {
     color: '#9ca3af',
     fontSize: 12,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  editAction: {
+    color: '#a855f7',
+    fontSize: 12,
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -246,6 +300,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 6,
     lineHeight: 22,
+  },
+  transcriptInput: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 8,
+    lineHeight: 22,
+    padding: 10,
+    minHeight: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3a3a4e',
+    backgroundColor: '#0f0f1c',
   },
   searching: {
     flexDirection: 'row',
