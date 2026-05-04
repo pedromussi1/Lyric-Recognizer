@@ -103,9 +103,12 @@ async function startSpotifyAuth(pending: PendingSpotifyAction): Promise<void> {
   });
   const authUrl = `https://accounts.spotify.com/authorize?${params}`;
   const popup = window.open(authUrl, '_blank');
-  if (!popup || popup.closed) {
-    // Pop-up blocker ate the new tab — fall back to same-tab redirect so
-    // the user can still complete auth.
+  // Don't check `popup.closed` — Chromium's cross-origin opener policy
+  // returns a stubbed Window where `.closed` reads as true even though the
+  // popup is open, and falling back to same-tab assign at that point ends
+  // up navigating the original tab through the whole OAuth flow itself.
+  // A null return is the only reliable "popup blocked" signal.
+  if (!popup) {
     window.location.assign(authUrl);
   }
 }
