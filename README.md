@@ -11,7 +11,7 @@
 </div>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="Lyric Recognizer matching Born to Run by Bruce Springsteen" width="720" />
+  <img src="docs/hero.png" alt="Lyric Recognizer matching Born to Run by Bruce Springsteen" width="720" />
 </p>
 
 ## How it works
