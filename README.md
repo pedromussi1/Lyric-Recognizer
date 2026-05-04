@@ -10,12 +10,9 @@
 
 </div>
 
-<!-- A screenshot of the deployed app belongs here. Take one in a browser
-     against the live URL above, save as docs/screenshot.png, and uncomment:
 <p align="center">
-  <img src="docs/screenshot.png" alt="Lyric Recognizer screenshot" width="600" />
+  <img src="docs/screenshot.png" alt="Lyric Recognizer matching Born to Run by Bruce Springsteen" width="720" />
 </p>
--->
 
 ## How it works
 
