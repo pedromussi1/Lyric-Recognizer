@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -16,7 +16,11 @@ import {
   startRecognition,
   type SpeechController,
 } from './src/services/speech';
-import { findSpotifyUrl } from './src/services/spotify';
+import {
+  handleSpotifyCallback,
+  isSpotifyConfigured,
+  openOnSpotify,
+} from './src/services/spotify';
 import type { SongMatch } from './src/types';
 
 export default function App() {
@@ -25,8 +29,33 @@ export default function App() {
   const [results, setResults] = useState<SongMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const controller = useRef<SpeechController | null>(null);
   const supported = isSpeechSupported();
+  const spotifyEnabled = isSpotifyConfigured();
+
+  // On mount, finish any in-flight Spotify OAuth and resume the song the
+  // user was trying to play before they got redirected.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const pending = await handleSpotifyCallback();
+      if (cancelled || !pending) return;
+      setStatusMessage(`Opening "${pending.title}" on Spotify…`);
+      const result = await openOnSpotify(pending.artist, pending.title);
+      if (cancelled) return;
+      if (result.status === 'opened') {
+        setStatusMessage(null);
+      } else if (result.status === 'not_found') {
+        setStatusMessage("Couldn't find that track on Spotify.");
+      } else {
+        setStatusMessage(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const runSearch = useCallback(async (text: string) => {
     if (!text.trim()) return;
@@ -34,19 +63,17 @@ export default function App() {
     setError(null);
     try {
       const matches = await findMatches(text);
-      // Enrich each match with Spotify + Apple Music links in parallel.
+      // Apple Music has no auth — we can pre-fetch its link for every match.
+      // Spotify is fetched on demand inside openOnSpotify so we never call
+      // it without the user's token.
       const enriched = await Promise.all(
         matches.map(async (m) => {
-          const [spotify, apple] = await Promise.all([
-            findSpotifyUrl(m.artist, m.title),
-            findAppleMusicUrl(m.artist, m.title),
-          ]);
+          const apple = await findAppleMusicUrl(m.artist, m.title);
           return {
             ...m,
-            spotifyUrl: spotify.url,
             appleMusicUrl: apple.url,
-            artworkUrl: m.artworkUrl ?? apple.artworkUrl ?? spotify.artworkUrl,
-            previewUrl: m.previewUrl ?? spotify.previewUrl ?? apple.previewUrl,
+            artworkUrl: m.artworkUrl ?? apple.artworkUrl,
+            previewUrl: m.previewUrl ?? apple.previewUrl,
           };
         }),
       );
@@ -63,6 +90,7 @@ export default function App() {
 
   const handleStart = useCallback(() => {
     setError(null);
+    setStatusMessage(null);
     setResults([]);
     setTranscript('');
     const c = startRecognition({
@@ -90,6 +118,16 @@ export default function App() {
   const handleStop = useCallback(() => {
     controller.current?.stop();
     setIsRecording(false);
+  }, []);
+
+  const handleSpotifyPress = useCallback(async (match: SongMatch) => {
+    setError(null);
+    const result = await openOnSpotify(match.artist, match.title);
+    if (result.status === 'redirecting') {
+      setStatusMessage('Redirecting to Spotify to sign in…');
+    } else if (result.status === 'not_found') {
+      setError("Couldn't find that track on Spotify.");
+    }
   }, []);
 
   const togglePress = isRecording ? handleStop : handleStart;
@@ -130,6 +168,7 @@ export default function App() {
           </View>
         ) : null}
 
+        {statusMessage ? <Text style={styles.status}>{statusMessage}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {results.length > 0 ? (
@@ -140,6 +179,8 @@ export default function App() {
                 key={`${m.artist}-${m.title}-${i}`}
                 match={m}
                 rank={i + 1}
+                spotifyEnabled={spotifyEnabled}
+                onSpotifyPress={() => handleSpotifyPress(m)}
               />
             ))}
           </View>
@@ -212,6 +253,12 @@ const styles = StyleSheet.create({
   searchingText: {
     color: '#9ca3af',
     fontSize: 14,
+  },
+  status: {
+    color: '#a855f7',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 16,
   },
   error: {
     color: '#f87171',

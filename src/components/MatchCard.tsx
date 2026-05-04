@@ -4,6 +4,8 @@ import type { SongMatch } from '../types';
 type Props = {
   match: SongMatch;
   rank: number;
+  spotifyEnabled: boolean;
+  onSpotifyPress: () => void;
 };
 
 function openUrl(url?: string) {
@@ -11,7 +13,7 @@ function openUrl(url?: string) {
   Linking.openURL(url).catch(() => {});
 }
 
-export function MatchCard({ match, rank }: Props) {
+export function MatchCard({ match, rank, spotifyEnabled, onSpotifyPress }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -50,10 +52,10 @@ export function MatchCard({ match, rank }: Props) {
       ) : null}
 
       <View style={styles.actions}>
-        {match.spotifyUrl ? (
+        {spotifyEnabled ? (
           <Pressable
             style={[styles.actionBtn, styles.spotifyBtn]}
-            onPress={() => openUrl(match.spotifyUrl)}
+            onPress={onSpotifyPress}
           >
             <Text style={styles.actionText}>Spotify</Text>
           </Pressable>

@@ -6,7 +6,6 @@ export type SongMatch = {
   matchedPhrase: string;
   artworkUrl?: string;
   previewUrl?: string;
-  spotifyUrl?: string;
   appleMusicUrl?: string;
 };
 
