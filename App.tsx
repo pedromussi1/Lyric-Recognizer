@@ -69,11 +69,15 @@ export default function App() {
       const enriched = await Promise.all(
         matches.map(async (m) => {
           const apple = await findAppleMusicUrl(m.artist, m.title);
+          // Prefer iTunes artwork over the Deezer/lyrics.ovh one — iTunes
+          // resolves the canonical studio version, which is usually what
+          // the user expects to see, while Deezer often returns the cover
+          // of whichever live or remaster variant matched first.
           return {
             ...m,
             appleMusicUrl: apple.url,
-            artworkUrl: m.artworkUrl ?? apple.artworkUrl,
-            previewUrl: m.previewUrl ?? apple.previewUrl,
+            artworkUrl: apple.artworkUrl ?? m.artworkUrl,
+            previewUrl: apple.previewUrl ?? m.previewUrl,
           };
         }),
       );
