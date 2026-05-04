@@ -21,6 +21,7 @@ import {
 import {
   handleSpotifyCallback,
   isSpotifyConfigured,
+  listenForSpotifyAuth,
   openOnSpotify,
 } from './src/services/spotify';
 import type { SongMatch } from './src/types';
@@ -37,10 +38,14 @@ export default function App() {
   const supported = isSpeechSupported();
   const spotifyEnabled = isSpotifyConfigured();
 
-  // On mount, finish any in-flight Spotify OAuth and resume the song the
-  // user was trying to play before they got redirected.
+  // On mount, two things:
+  //  1) If we landed here via the same-tab OAuth fallback (popup blocker
+  //     caught the new tab), finish the exchange and resume.
+  //  2) Listen for status messages from Spotify auth popup tabs so we can
+  //     show "Opened on Spotify" / error feedback in the original tab.
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       const pending = await handleSpotifyCallback();
       if (cancelled || !pending) return;
@@ -55,8 +60,23 @@ export default function App() {
         setStatusMessage(null);
       }
     })();
+
+    const unsubscribe = listenForSpotifyAuth((event) => {
+      if (event.kind === 'opened') {
+        setStatusMessage(`Opened "${event.title}" on Spotify`);
+      } else if (event.kind === 'failed') {
+        setStatusMessage(null);
+        if (event.reason === 'not_found') {
+          setError("Couldn't find that track on Spotify.");
+        } else {
+          setError('Spotify sign-in failed. Try again.');
+        }
+      }
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
@@ -144,9 +164,10 @@ export default function App() {
 
   const handleSpotifyPress = useCallback(async (match: SongMatch) => {
     setError(null);
+    setStatusMessage(null);
     const result = await openOnSpotify(match.artist, match.title);
-    if (result.status === 'redirecting') {
-      setStatusMessage('Redirecting to Spotify to sign in…');
+    if (result.status === 'authorizing') {
+      setStatusMessage('Opening Spotify sign-in in a new tab…');
     } else if (result.status === 'not_found') {
       setError("Couldn't find that track on Spotify.");
     }
