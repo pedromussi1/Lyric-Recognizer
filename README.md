@@ -5,8 +5,8 @@ Sing or speak the lyrics to a song and get a ranked list of likely matches with 
 ## How it works
 
 1. **Capture** — the browser's Web Speech API transcribes your voice in real time.
-2. **Search** — the transcript is sent to the [lyrics.ovh](https://lyricsovh.docs.apiary.io/) suggest endpoint, which returns candidate songs.
-3. **Rank** — for the top candidates we fetch the full lyrics and score each against your transcript using a token + bigram similarity. Results are ordered by confidence (rank-weighted) and a 0–100% match score.
+2. **Search** — the transcript goes to the [Genius API](https://docs.genius.com/), whose search hits actual lyric content rather than just song titles. (If no Genius token is configured the app falls back to [lyrics.ovh](https://lyricsovh.docs.apiary.io/), which only matches titles — so without Genius, the app only works when you sing the title phrase.)
+3. **Rank** — for the top candidates we fetch the full lyrics from lyrics.ovh and score each against your transcript using a token + bigram similarity. Results are ordered by confidence (rank-weighted) with a 0–100% match score. When lyrics.ovh doesn't have a song's text, we fall back to Genius's own search ranking.
 4. **Listen** — every match gets an Apple Music link via the public iTunes Search API. The Spotify button uses [Authorization Code with PKCE](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow): on first click, you sign into your own Spotify account; afterward the app uses your token to find and open the track.
 
 ```
@@ -41,6 +41,21 @@ npm run web
 
 Open the URL Expo prints, click the microphone, and start singing. That's it — Apple Music links and lyric matching work out of the box.
 
+## Recommended: enable Genius lyric search
+
+Without a Genius token the app falls back to lyrics.ovh's title-only search, so it only finds songs when you sing the title. Setting up Genius takes about 30 seconds and unlocks real lyric-content search (e.g. *"I was happy in the haze of a drunken hour"* → *Heaven Knows I'm Miserable Now*).
+
+1. Go to <https://genius.com/api-clients>, sign in or create an account.
+2. Click **New API Client**. Use any URL for the website / redirect fields — Genius doesn't validate them for read-only access.
+3. On the next page, click **Generate Access Token** and copy the token.
+4. In `d:\LyricRecognizer\.env` (copy from `.env.example` if it doesn't exist):
+   ```
+   EXPO_PUBLIC_GENIUS_TOKEN=paste_your_token_here
+   ```
+5. Restart `npm run web`.
+
+The token is free and read-only. There's no expiry and no card on file.
+
 ## Optional: enable the Spotify button
 
 The Spotify integration is opt-in. If you skip this, the Spotify button is hidden and everything else still works.
@@ -72,7 +87,8 @@ When a user clicks the Spotify button on a match for the first time, they're sen
     │   └── MatchCard.tsx
     ├── services/
     │   ├── speech.ts        # Web Speech API wrapper
-    │   ├── lyricsMatcher.ts # lyrics.ovh + ranking
+    │   ├── genius.ts        # Genius search (lyric-content)
+    │   ├── lyricsMatcher.ts # candidate dispatch + ranking
     │   ├── spotify.ts       # PKCE OAuth + search
     │   └── appleMusic.ts    # iTunes Search API (no auth)
     ├── utils/
@@ -91,7 +107,8 @@ When a user clicks the Spotify button on a match for the first time, they're sen
 
 - [Expo](https://expo.dev/) (React Native + Web)
 - TypeScript
-- [lyrics.ovh](https://lyricsovh.docs.apiary.io/) — public lyrics API
+- [Genius API](https://docs.genius.com/) — lyric-content search
+- [lyrics.ovh](https://lyricsovh.docs.apiary.io/) — public lyrics text API + zero-token fallback search
 - [iTunes Search API](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/) — Apple Music links, no auth
 - [Spotify Web API](https://developer.spotify.com/documentation/web-api) with [Authorization Code + PKCE](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow) — entirely client-side
 - Web Speech API for voice capture
